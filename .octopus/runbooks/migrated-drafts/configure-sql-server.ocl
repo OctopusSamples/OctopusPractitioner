@@ -1,0 +1,47 @@
+name = "Configure SQL Server"
+default_guided_failure_mode = "EnvironmentDefault"
+description = ""
+
+connectivity_policy {
+    allow_deployments_to_no_targets = true
+}
+
+run_retention_policy {
+    type = "Default"
+}
+
+process {
+    step "install-sql-server" {
+        name = "Install SQL Server"
+
+        action {
+            action_type = "Octopus.Script"
+            properties = {
+                Octopus.Action.Script.ScriptBody = <<-EOT
+                    Write-Host "Installing SQL Server Localdb"
+                    choco install sqllocaldb -y
+                    EOT
+                Octopus.Action.Script.ScriptSource = "Inline"
+                Octopus.Action.Script.Syntax = "PowerShell"
+                OctopusUseBundledTooling = "False"
+            }
+            worker_pool = "hosted-windows"
+        }
+    }
+
+    step "sql-create-database-if-not-exists" {
+        name = "SQL - Create Database If Not Exists"
+
+        action {
+            properties = {
+                createCommandTimeout = "30"
+                createDatabaseName = "#{Project.Database.Name}"
+                createSqlDatabaseRetryAttempts = "0"
+                createSqlServer = "#{Project.Database.Server.Name}"
+                Octopus.Action.Template.Id = "ActionTemplates-2"
+                Octopus.Action.Template.Version = "5"
+            }
+            worker_pool = "hosted-windows"
+        }
+    }
+}
