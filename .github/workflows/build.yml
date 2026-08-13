@@ -112,12 +112,6 @@ jobs:
           base_path: "artifacts/database"
           files: "**/*"
           output_folder: packaged
-      
-      - name: Upload artifacts to GitHub
-        uses: actions/upload-artifact@v3
-        with:
-          name: assets-for-download
-          path: packaged
           
       - name: push packages to Octopus
         uses: OctopusDeploy/push-package-action@v3
