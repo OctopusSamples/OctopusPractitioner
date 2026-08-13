@@ -8,6 +8,16 @@ on:
       - 'bugfix/**' 
   workflow_dispatch:
 
+env:  
+  OCTOPUS_PROJECT_NAME: Trident
+  OCTOPUS_FEATURE_BRANCH_CHANNEL: Default
+  OCTOPUS_FEATURE_BRANCH_ENVIRONMENT: Development
+  OCTOPUS_RELEASE_CHANNEL: Release
+  OCTOPUS_RELEASE_ENVIRONMENT: Staging  
+  OCTOPUS_SPACE: Integration-Flyway
+  OCTOPUS_API_KEY: ${{ secrets.OCTOPUSSERVERAPIKEY }}
+  OCTOPUS_URL: ${{ secrets.OCTOPUSSERVERURL }}
+
 jobs:
 
   build-and-push-application:
@@ -31,6 +41,10 @@ jobs:
           $branchName = (((${env:GITHUB_REF} -replace "refs/heads/", "") -replace "feature/", "") -replace "bugfix/", "") -replace " ", ""
           Write-Host "The Branch Name is: $branchName"
 
+          $channelName = "${env:OCTOPUS_RELEASE_CHANNEL}"
+          Write-Host "The channel name is now $channelName"
+          $environmentName = "${env:OCTOPUS_RELEASE_ENVIRONMENT}"
+          Write-Host "The environment name is now $environmentName"
           $versionNumber = "$($versionPrefix).${env:GITHUB_RUN_NUMBER}"
           Write-Host "The version number is now $versionNumber"
 
@@ -38,12 +52,22 @@ jobs:
           {
               Write-Host "The branch is not the main branch, using the feature branch settings instead."
               
+              $channelName = "${env:OCTOPUS_FEATURE_BRANCH_CHANNEL}"
+              Write-Host "The channel name is now $channelName"
+              $environmentName = "${env:OCTOPUS_FEATURE_BRANCH_ENVIRONMENT}"
+              Write-Host "The environment name is now $environmentName"
               $versionNumber = "$versionNumber-$branchName"
               Write-Host "The version number is now $versionNumber"
-          }          
+          }
+
+          Write-Host "Setting the Output Variable OCTOPUS_CHANNEL to $channelName"
+          Write-Output "OCTOPUS_CHANNEL=$channelName" >> $Env:GITHUB_OUTPUT
 
           Write-Host "Setting the Output Variable VERSION to $versionNumber"
           Write-Output "APP_VERSION=$versionNumber" >> $Env:GITHUB_OUTPUT
+
+          Write-Host "Setting the Output Variable OCTOPUS_ENVIRONMENT to $environmentName"
+          Write-Output "OCTOPUS_ENVIRONMENT=$environmentName" >> $Env:GITHUB_OUTPUT
 
         shell: pwsh
       - name: Setup .NET SDK
@@ -68,4 +92,59 @@ jobs:
       - name: build database        
         working-directory: src/Octopus.Trident.Database.DbUp
         run: dotnet publish --output "$GITHUB_WORKSPACE/artifacts/database" -c Release --runtime win-x64 --sc true --p:PublishSingleFile=true --p:PublishTrimmed=true --p:Version=${{ steps.ReleaseNum.outputs.APP_VERSION }}            
+
+      - name: package website
+        id: "website_package"
+        uses: OctopusDeploy/create-zip-package-action@v3
+        with:
+          package_id: Trident.Web
+          version: ${{ steps.ReleaseNum.outputs.APP_VERSION }}  
+          base_path: "artifacts/web"
+          files: "**/*"
+          output_folder: packaged        
+    
+      - name: package database
+        id: "database_package"
+        uses: OctopusDeploy/create-zip-package-action@v3
+        with:
+          package_id: Trident.Database
+          version: ${{ steps.ReleaseNum.outputs.APP_VERSION }}  
+          base_path: "artifacts/database"
+          files: "**/*"
+          output_folder: packaged
+      
+      - name: Upload artifacts to GitHub
+        uses: actions/upload-artifact@v3
+        with:
+          name: assets-for-download
+          path: packaged
           
+      - name: push packages to Octopus
+        uses: OctopusDeploy/push-package-action@v3
+        with:
+          packages: |
+            packaged/**/*.zip
+
+      - name: push build information to Octopus
+        uses: OctopusDeploy/push-build-information-action@v3
+        with:
+          packages: |
+            Trident.Database
+            Trident.Web
+          version: ${{ steps.ReleaseNum.outputs.APP_VERSION }}
+            
+      - name: create release
+        uses: OctopusDeploy/create-release-action@v3
+        with:
+          project: ${{ env.OCTOPUS_PROJECT_NAME }}
+          channel: ${{ steps.ReleaseNum.outputs.OCTOPUS_CHANNEL }}
+          release_number: ${{ steps.ReleaseNum.outputs.APP_VERSION }}
+          package_version: ${{ steps.ReleaseNum.outputs.APP_VERSION }}
+      
+      - name: deploy release
+        uses: OctopusDeploy/deploy-release-action@v3
+        id: "deploy_release"
+        with:
+          project: ${{ env.OCTOPUS_PROJECT_NAME }}
+          release_number: ${{ steps.ReleaseNum.outputs.APP_VERSION }}
+          environments: ${{ steps.ReleaseNum.outputs.OCTOPUS_ENVIRONMENT }}
