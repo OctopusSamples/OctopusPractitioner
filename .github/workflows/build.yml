@@ -120,7 +120,7 @@ jobs:
           output_folder: packaged
           
       - name: push packages to Octopus
-        uses: OctopusDeploy/push-package-action@v3
+        uses: OctopusDeploy/push-package-action@v4
         with:
           packages: |
             packaged/**/*.zip
@@ -134,7 +134,7 @@ jobs:
           version: ${{ steps.ReleaseNum.outputs.APP_VERSION }}
             
       - name: create release
-        uses: OctopusDeploy/create-release-action@v3
+        uses: OctopusDeploy/create-release-action@v4
         with:
           project: ${{ env.OCTOPUS_PROJECT_NAME }}
           channel: ${{ steps.ReleaseNum.outputs.OCTOPUS_CHANNEL }}
@@ -142,7 +142,7 @@ jobs:
           package_version: ${{ steps.ReleaseNum.outputs.APP_VERSION }}
       
       - name: deploy release
-        uses: OctopusDeploy/deploy-release-action@v3
+        uses: OctopusDeploy/deploy-release-action@v4
         id: "deploy_release"
         with:
           project: ${{ env.OCTOPUS_PROJECT_NAME }}
