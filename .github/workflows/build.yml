@@ -78,4 +78,59 @@ jobs:
       - name: build database        
         working-directory: src/Octopus.Trident.Database.DbUp
         run: dotnet publish --output "$GITHUB_WORKSPACE/artifacts/database" -c Release --runtime win-x64 --sc true --p:PublishSingleFile=true --p:PublishTrimmed=true --p:Version=${{ steps.ReleaseNum.outputs.APP_VERSION }}            
+
+      - name: package website
+        id: "website_package"
+        uses: OctopusDeploy/create-zip-package-action@v3
+        with:
+          package_id: Trident.Web
+          version: ${{ steps.ReleaseNum.outputs.APP_VERSION }}  
+          base_path: "artifacts/web"
+          files: "**/*"
+          output_folder: packaged        
+    
+      - name: package database
+        id: "database_package"
+        uses: OctopusDeploy/create-zip-package-action@v3
+        with:
+          package_id: Trident.Database
+          version: ${{ steps.ReleaseNum.outputs.APP_VERSION }}  
+          base_path: "artifacts/database"
+          files: "**/*"
+          output_folder: packaged
+      
+      - name: Upload artifacts to GitHub
+        uses: actions/upload-artifact@v3
+        with:
+          name: assets-for-download
+          path: packaged
           
+      - name: push packages to Octopus
+        uses: OctopusDeploy/push-package-action@v3
+        with:
+          packages: |
+            packaged/**/*.zip
+
+      - name: push build information to Octopus
+        uses: OctopusDeploy/push-build-information-action@v3
+        with:
+          packages: |
+            Trident.Database
+            Trident.Web
+          version: ${{ steps.ReleaseNum.outputs.APP_VERSION }}
+            
+      - name: create release
+        uses: OctopusDeploy/create-release-action@v3
+        with:
+          project: ${{ env.OCTOPUS_PROJECT_NAME }}
+          channel: ${{ steps.ReleaseNum.outputs.OCTOPUS_CHANNEL }}
+          release_number: ${{ steps.ReleaseNum.outputs.APP_VERSION }}
+          package_version: ${{ steps.ReleaseNum.outputs.APP_VERSION }}
+      
+      - name: deploy release
+        uses: OctopusDeploy/deploy-release-action@v3
+        id: "deploy_release"
+        with:
+          project: ${{ env.OCTOPUS_PROJECT_NAME }}
+          release_number: ${{ steps.ReleaseNum.outputs.APP_VERSION }}
+          environments: ${{ steps.ReleaseNum.outputs.OCTOPUS_ENVIRONMENT }}
