@@ -41,6 +41,10 @@ jobs:
           $branchName = (((${env:GITHUB_REF} -replace "refs/heads/", "") -replace "feature/", "") -replace "bugfix/", "") -replace " ", ""
           Write-Host "The Branch Name is: $branchName"
 
+          $channelName = "${env:OCTOPUS_RELEASE_CHANNEL}"
+          Write-Host "The channel name is now $channelName"
+          $environmentName = "${env:OCTOPUS_RELEASE_ENVIRONMENT}"
+          Write-Host "The environment name is now $environmentName"
           $versionNumber = "$($versionPrefix).${env:GITHUB_RUN_NUMBER}"
           Write-Host "The version number is now $versionNumber"
 
@@ -48,12 +52,22 @@ jobs:
           {
               Write-Host "The branch is not the main branch, using the feature branch settings instead."
               
+              $channelName = "${env:OCTOPUS_FEATURE_BRANCH_CHANNEL}"
+              Write-Host "The channel name is now $channelName"
+              $environmentName = "${env:OCTOPUS_FEATURE_BRANCH_ENVIRONMENT}"
+              Write-Host "The environment name is now $environmentName"
               $versionNumber = "$versionNumber-$branchName"
               Write-Host "The version number is now $versionNumber"
-          }          
+          }
+
+          Write-Host "Setting the Output Variable OCTOPUS_CHANNEL to $channelName"
+          Write-Output "OCTOPUS_CHANNEL=$channelName" >> $Env:GITHUB_OUTPUT
 
           Write-Host "Setting the Output Variable VERSION to $versionNumber"
           Write-Output "APP_VERSION=$versionNumber" >> $Env:GITHUB_OUTPUT
+
+          Write-Host "Setting the Output Variable OCTOPUS_ENVIRONMENT to $environmentName"
+          Write-Output "OCTOPUS_ENVIRONMENT=$environmentName" >> $Env:GITHUB_OUTPUT
 
         shell: pwsh
       - name: Setup .NET SDK
