@@ -140,6 +140,7 @@ jobs:
           channel: ${{ steps.ReleaseNum.outputs.OCTOPUS_CHANNEL }}
           release_number: ${{ steps.ReleaseNum.outputs.APP_VERSION }}
           package_version: ${{ steps.ReleaseNum.outputs.APP_VERSION }}
+          git_ref: ${{github.ref}}
       
       - name: deploy release
         uses: OctopusDeploy/deploy-release-action@v3
